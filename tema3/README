@@ -1,0 +1,125 @@
+@Descrierea implementării:
+
+    Matricile imaginilor și filtrelor au fost implementate prin vectori de vectori din biblioteca
+standard, iar pixelii prin tripleți, structură definită de mine asemănător cu std::pair.
+    Funcția compute_filter() aplică filtrul dat pe imaginea dată (prin produsul de convoluție)
+și asigură valorile pixelilor în intervalul [0, 255]. Celelalte funcții din filter.hpp o vor
+apela pe aceasta pentru matricea nucleu corespunzătoare.
+    Indiferent de numărul de procese (chiar și 1), primul proces este cel care se va ocupa de
+citirea și scrierea imaginii, dar toate o vor procesa (aplica filtrele pe ea, pe bucăți).
+    Dacă există mai multe procese, pentru un filtru dat, imaginea va fi împărțită în
+subimagini de N / P linii și M coloane, unde N = numărul de linii ale imaginii inițiale,
+M = numărul de coloane, iar P = numărul de procese. La citire adaug un contur imaginii, adică
+încă o linie și coloană cu zerouri la începutul și sfârșitul matricii.
+    Primul proces va trimite linie cu linie câte o subimagine fiecărui alt proces, care o va
+procesa, apoi va primi subimaginile procesate și le va îmbina în poza finală. Celelate procese vor
+avea, totuși, nevoie și de linia de deasupra și de sub matricea primită pentru procesare, dar o
+vor primi fără a o și modifica.
+    Procesele vor primi la început N și M, care sunt întregi fără semn, deci tipuri primitive, dar,
+pentru a putea primi și trimite o linie din matrice, care este un vector de tripleți, deci un tip
+definit de mine (o clasă parametrizată de o altă clasă parametrizată: vector<triplet<T1, T2, T3>>)
+a trebui să creez un nou tip al MPI, prin MPI_Datatype, MPI_Type_vector și MPI_Type_commit.
+    Pentru mai multe filtre, primul proces va citi imaginea, va trimite subimaginile celorlalte,
+procese, toate se vor ocupa de procesarea fiecărei bucăți, apoi va îmbina subimaginile în imaginea
+finală și se va întoarce la al doilea pas până va epuiza filtrele date la intrare, iar la final
+va scrie în fișier imaginea rezultată. Pentru optimizarea timpului de execuție, la apelurile de
+funcții, matricile sunt trimise prin referință și nu valoare, iar obiectele temporare sunt mutate
+și nu copiate, pentru a evita efectuarea de copii inutile.
+
+
+@Teste și scalabilitate:
+
+    După cum putem observa pe testele rulate pe cele mai mari imagini pgm și pnm, față de cazul de
+bază cu un proces și un filtru, cu cât sunt mai multe procese și mai multe filtre, diferența de
+timp devine din ce în ce mai mare. Pentru obținerea acestor timp am folosit scriptul atașat și
+rulat de câte 100 de ori fiecare test, apoi făcută media aritmetică a timpilor. Procesorul
+pe care am efectuat testele are 12 nuclee și frecvența de 4.5GHz.
+
+    rorschach.pgm:
+        1 filter:
+             1 thread:  avg 2.5870 sec
+             2 threads: avg 1.6200 sec
+             3 threads: avg 1.3600 sec
+             4 threads: avg 1.1360 sec
+             5 threads: avg 1.0440 sec
+             6 threads: avg 1.0210 sec
+             7 threads: avg 1.1620 sec
+             8 threads: avg 1.1570 sec
+             9 threads: avg 1.1340 sec
+            10 threads: avg 1.0860 sec
+            11 threads: avg 1.0690 sec
+            12 threads: avg 1.1750 sec
+
+        5 filters:
+             1 thread:  avg 10.984 sec
+             2 threads: avg 5.9460 sec
+             3 threads: avg 4.2810 sec
+             4 threads: avg 3.5600 sec
+             5 threads: avg 3.1890 sec
+             6 threads: avg 2.9980 sec
+             7 threads: avg 3.6970 sec
+             8 threads: avg 3.3560 sec
+             9 threads: avg 3.2330 sec
+            10 threads: avg 3.0760 sec
+            11 threads: avg 2.9400 sec
+            12 threads: avg 2.9780 sec
+
+        10 filters:
+             1 thread:  avg 21.566 sec
+             2 threads: avg 11.450 sec
+             3 threads: avg 8.2750 sec
+             4 threads: avg 6.7950 sec
+             5 threads: avg 6.0380 sec
+             6 threads: avg 5.4400 sec
+             7 threads: avg 6.7310 sec
+             8 threads: avg 6.1750 sec
+             9 threads: avg 5.9060 sec
+            10 threads: avg 5.4320 sec
+            11 threads: avg 5.2330 sec
+            12 threads: avg 5.1230 sec
+
+
+    landscape.pnm:
+        1 filter:
+             1 thread:  avg 3.3330 sec
+             2 threads: avg 2.5710 sec
+             3 threads: avg 2.2960 sec
+             4 threads: avg 1.8970 sec
+             5 threads: avg 1.9570 sec
+             6 threads: avg 1.7390 sec
+             7 threads: avg 1.8390 sec
+             8 threads: avg 1.8510 sec
+             9 threads: avg 1.8460 sec
+            10 threads: avg 1.8840 sec
+            11 threads: avg 1.8930 sec
+            12 threads: avg 1.8240 sec
+
+        5 filters:
+             1 threads: avg 12.313 sec
+             2 threads: avg 6.9500 sec
+             3 threads: avg 5.0610 sec
+             4 threads: avg 4.4330 sec
+             5 threads: avg 4.0990 sec
+             6 threads: avg 3.7600 sec
+             7 threads: avg 4.7070 sec
+             8 threads: avg 4.2320 sec
+             9 threads: avg 4.0670 sec
+            10 threads: avg 3.9390 sec
+            11 threads: avg 3.8390 sec
+            12 threads: avg 3.7850 sec
+
+        10 filters:
+             1 thread:  avg 24.272 sec
+             2 threads: avg 13.470 sec
+             3 threads: avg 9.4690 sec
+             4 threads: avg 8.2020 sec
+             5 threads: avg 7.3480 sec
+             6 threads: avg 6.4770 sec
+             7 threads: avg 7.7070 sec
+             8 threads: avg 7.4280 sec
+             9 threads: avg 6.8100 sec
+            10 threads: avg 6.5280 sec
+            11 threads: avg 6.3320 sec
+            12 threads: avg 6.0230 sec
+
+
